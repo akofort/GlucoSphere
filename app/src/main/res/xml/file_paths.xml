@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Exposes only app/cache/shared_pdfs/ (see ChatPdfExport.kt) via the FileProvider content URI
+     used to hand a generated PDF to the system share sheet; nothing else under the app's cache
+     or files directory is reachable through this provider. -->
+<paths>
+    <cache-path name="shared_pdfs" path="shared_pdfs/" />
+</paths>

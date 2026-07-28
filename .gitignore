@@ -1,0 +1,38 @@
+*.iml
+.gradle
+/local.properties
+/.idea/caches
+/.idea/libraries
+/.idea/modules.xml
+/.idea/workspace.xml
+/.idea/navEditor.xml
+/.idea/assetWizardSettings.xml
+.DS_Store
+/build
+/captures
+.externalNativeBuild
+.cxx
+local.properties
+
+# Module build outputs (the root-level /build above doesn't cover app/build -- a leading "/"
+# anchors to the .gitignore's own directory, not recursively).
+**/build/
+.kotlin/
+
+# Signing / secrets -- never committed, even to a private repo.
+*.keystore
+*.jks
+*.pem
+/keystore/
+keystore.properties
+
+# Built artifacts -- regenerate via ./gradlew, don't version them.
+*.apk
+*.aab
+*.hprof
+
+# Ad-hoc debugging artifacts (adb screenshots, uiautomator dumps, emulator logs) that occasionally
+# land at the project root during manual on-device testing -- never part of the actual app.
+/emulator.log
+/t*.png
+/uid*.xml
