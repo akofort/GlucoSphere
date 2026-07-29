@@ -408,6 +408,10 @@ class GlucoSphereViewModel(
                         _aiActivityState.value = AiActivityState.Idle
                         addItem(ChatItem.PendingConfirmation(newId(), event.request.description, event.request))
                     }
+                    is AgentEvent.SourceChoiceRequired -> {
+                        _aiActivityState.value = AiActivityState.Idle
+                        addItem(ChatItem.PendingSourceChoice(newId(), event.options, event.request))
+                    }
                     is AgentEvent.ToolCallStarted -> {
                         _aiActivityState.value = AiActivityState.CallingTool(event.toolCall.name, event.serverName)
                         addItem(ChatItem.ToolActivity(newId(), event.toolCall.name, currentStrings().toolRunning))
@@ -459,6 +463,12 @@ class GlucoSphereViewModel(
 
     fun respondToConfirmation(item: ChatItem.PendingConfirmation, approved: Boolean) {
         item.request.respond(approved)
+        _chatItems.update { items -> items.filterNot { it.id == item.id } }
+    }
+
+    /** [pickedServerId] null = "Alle Quellen" (see [com.example.diabai.domain.SourceChoiceRequest]). */
+    fun respondToSourceChoice(item: ChatItem.PendingSourceChoice, pickedServerId: String?) {
+        item.request.respond(pickedServerId)
         _chatItems.update { items -> items.filterNot { it.id == item.id } }
     }
 

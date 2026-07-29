@@ -36,6 +36,7 @@ data class SettingsBackup(
     val nightscoutApiSecret: String = "",
     val nightscoutApiAuthMethod: AuthMethod = AuthMethod.API_SECRET_HEADER,
     val nightscoutApiEnabled: Boolean = true,
+    val nightscoutApiName: String = "",
     val systemPrompt: String = DEFAULT_SYSTEM_PROMPT,
     val additionalInstructions: String = "",
     val licenseKey: String = "",
@@ -54,6 +55,7 @@ data class SettingsBackup(
     val oneProviderModel: String = AUTO_MODEL_ID,
     val appLanguage: AppLanguage = AppLanguage.GERMAN,
     val userRole: UserRole = UserRole.DIABETIKER,
+    val colorTheme: AppColorTheme = AppColorTheme.MEDICAL_BLUE,
     val llmUsage: List<DailyLlmUsage> = emptyList(),
 )
 
@@ -64,6 +66,7 @@ fun AppSettings.toBackup(): SettingsBackup = SettingsBackup(
     nightscoutApiSecret = nightscoutApiSecret,
     nightscoutApiAuthMethod = nightscoutApiAuthMethod,
     nightscoutApiEnabled = nightscoutApiEnabled,
+    nightscoutApiName = nightscoutApiName,
     systemPrompt = systemPrompt,
     additionalInstructions = additionalInstructions,
     licenseKey = licenseKey,
@@ -82,6 +85,7 @@ fun AppSettings.toBackup(): SettingsBackup = SettingsBackup(
     oneProviderModel = oneProviderModel,
     appLanguage = appLanguage,
     userRole = userRole,
+    colorTheme = colorTheme,
     llmUsage = llmUsage,
 )
 

@@ -5,6 +5,7 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -69,6 +70,8 @@ import com.example.diabai.domain.discovery.DiscoveryRecord
 import com.example.diabai.network.McpTool
 import com.example.diabai.network.NIGHTSCOUT_DIRECT_SERVER_ID
 import com.example.diabai.network.nightscoutDirectServer
+import com.example.diabai.ui.theme.McpServerAccentColor
+import com.example.diabai.ui.theme.RestApiAccentColor
 
 /**
  * Sub-menu: configure where health data comes from. Up to [MAX_MCP_SERVERS] independent MCP
@@ -112,6 +115,7 @@ fun DataSourcesScreen(
     var nightscoutApiSecret by remember(settings.nightscoutApiSecret) { mutableStateOf(settings.nightscoutApiSecret) }
     var nightscoutApiAuthMethod by remember(settings.nightscoutApiAuthMethod) { mutableStateOf(settings.nightscoutApiAuthMethod) }
     var nightscoutApiEnabled by remember(settings.nightscoutApiEnabled) { mutableStateOf(settings.nightscoutApiEnabled) }
+    var nightscoutApiName by remember(settings.nightscoutApiName) { mutableStateOf(settings.nightscoutApiName) }
 
     // Eagerly fetches tool lists for already-connected servers so the accordion's collapsed
     // header can show a real tool count without requiring the user to expand each card first.
@@ -186,29 +190,32 @@ fun DataSourcesScreen(
             secret = nightscoutApiSecret,
             authMethod = nightscoutApiAuthMethod,
             enabled = nightscoutApiEnabled,
+            name = nightscoutApiName,
             configured = settings.nightscoutApiUrl.isNotBlank(),
             testState = nightscoutApiTestState,
             discoveryState = discoveryUiStates[NIGHTSCOUT_DIRECT_SERVER_ID] ?: DiscoveryUiState.Idle,
             onUrlChange = { nightscoutApiUrl = it },
             onSecretChange = { nightscoutApiSecret = it },
             onAuthMethodChange = { nightscoutApiAuthMethod = it },
+            onNameChange = { nightscoutApiName = it },
             onEnabledChange = { checked ->
                 nightscoutApiEnabled = checked
-                viewModel.saveNightscoutApi(nightscoutApiUrl.trim(), nightscoutApiAuthMethod, nightscoutApiSecret.trim(), checked)
+                viewModel.saveNightscoutApi(nightscoutApiUrl.trim(), nightscoutApiAuthMethod, nightscoutApiSecret.trim(), checked, nightscoutApiName.trim())
             },
             onTest = {
                 viewModel.testNightscoutApi(nightscoutApiUrl.trim(), nightscoutApiAuthMethod, nightscoutApiSecret.trim())
             },
             onSave = {
-                viewModel.saveNightscoutApi(nightscoutApiUrl.trim(), nightscoutApiAuthMethod, nightscoutApiSecret.trim(), nightscoutApiEnabled)
+                viewModel.saveNightscoutApi(nightscoutApiUrl.trim(), nightscoutApiAuthMethod, nightscoutApiSecret.trim(), nightscoutApiEnabled, nightscoutApiName.trim())
             },
             onDiscover = {
                 val config = settings.nightscoutDirectServer() ?: return@NightscoutApiSection
                 viewModel.runNightscoutDiscovery(config)
-                discoverySheetTarget = DiscoveryTarget(NIGHTSCOUT_DIRECT_SERVER_ID, strings.dsNightscoutRestApiName)
+                discoverySheetTarget = DiscoveryTarget(NIGHTSCOUT_DIRECT_SERVER_ID, config.displayName)
             },
             onOpenDiscoverySheet = {
-                discoverySheetTarget = DiscoveryTarget(NIGHTSCOUT_DIRECT_SERVER_ID, strings.dsNightscoutRestApiName)
+                val name = settings.nightscoutDirectServer()?.displayName ?: strings.dsNightscoutRestApiName
+                discoverySheetTarget = DiscoveryTarget(NIGHTSCOUT_DIRECT_SERVER_ID, name)
             },
         )
     }
@@ -408,7 +415,12 @@ private fun McpServerAccordionCard(
         enabled = enabled,
     )
 
-    Surface(shape = MaterialTheme.shapes.medium, tonalElevation = 1.dp, modifier = Modifier.fillMaxWidth()) {
+    Surface(
+        shape = MaterialTheme.shapes.medium,
+        tonalElevation = 1.dp,
+        border = BorderStroke(1.dp, McpServerAccentColor.copy(alpha = 0.4f)),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
         Column {
             Row(
                 modifier = Modifier
@@ -803,6 +815,9 @@ private fun NightscoutApiSection(
     secret: String,
     authMethod: AuthMethod,
     enabled: Boolean,
+    /** User-editable display name for this source (see [com.example.diabai.data.AppSettings.nightscoutApiName]) --
+     * blank falls back to plain "Nightscout" wherever the source is shown outside this screen. */
+    name: String,
     /** Whether the *persisted* settings already have a non-blank URL -- used only for the
      * collapsed-state summary/status dot, independent of whatever's currently being edited but
      * not yet saved in this card. */
@@ -812,6 +827,7 @@ private fun NightscoutApiSection(
     onUrlChange: (String) -> Unit,
     onSecretChange: (String) -> Unit,
     onAuthMethodChange: (AuthMethod) -> Unit,
+    onNameChange: (String) -> Unit,
     onEnabledChange: (Boolean) -> Unit,
     onTest: () -> Unit,
     onSave: () -> Unit,
@@ -831,7 +847,12 @@ private fun NightscoutApiSection(
     // server cards; only "Aktiviert" (below) still requires a passing test.
     val canSave = !isTesting
 
-    Surface(shape = MaterialTheme.shapes.medium, tonalElevation = 1.dp, modifier = Modifier.fillMaxWidth()) {
+    Surface(
+        shape = MaterialTheme.shapes.medium,
+        tonalElevation = 1.dp,
+        border = BorderStroke(1.dp, RestApiAccentColor.copy(alpha = 0.4f)),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
         Column {
             Row(
                 modifier = Modifier.fillMaxWidth().clickable { expanded = !expanded }.padding(12.dp),
@@ -839,11 +860,17 @@ private fun NightscoutApiSection(
             ) {
                 TrafficLightBadge(testState)
                 Spacer(Modifier.width(8.dp))
-                Text(
-                    text = strings.dsNightscoutTitle,
-                    style = MaterialTheme.typography.bodyLarge,
-                    modifier = Modifier.weight(1f, fill = true),
-                )
+                Column(modifier = Modifier.weight(1f, fill = true)) {
+                    Text(
+                        text = strings.dsNightscoutTitle,
+                        style = MaterialTheme.typography.bodyLarge,
+                    )
+                    Text(
+                        text = strings.dsRestApiHint,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = RestApiAccentColor,
+                    )
+                }
                 if (configured && !enabled) {
                     Text(strings.genericDisabled, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.error)
                     Spacer(Modifier.width(8.dp))
@@ -870,6 +897,16 @@ private fun NightscoutApiSection(
                     )
                     Spacer(Modifier.height(8.dp))
 
+                    OutlinedTextField(
+                        value = name,
+                        onValueChange = onNameChange,
+                        modifier = Modifier.fillMaxWidth(),
+                        label = { Text(strings.dsNameLabel) },
+                        placeholder = { Text(strings.dsNamePlaceholder) },
+                        singleLine = true,
+                        enabled = !isTesting,
+                    )
+                    Spacer(Modifier.height(12.dp))
                     OutlinedTextField(
                         value = url,
                         onValueChange = onUrlChange,

@@ -43,6 +43,7 @@ fun ChatScreen(viewModel: GlucoSphereViewModel, ttsController: TtsController? = 
         onSend = viewModel::sendMessage,
         onCancel = viewModel::cancelGeneration,
         onConfirm = viewModel::respondToConfirmation,
+        onSourceChoice = viewModel::respondToSourceChoice,
         onMessageCopied = { viewModel.showTransientMessage(strings.messageCopied) },
         appLanguage = settings.appLanguage,
         ttsController = ttsController,

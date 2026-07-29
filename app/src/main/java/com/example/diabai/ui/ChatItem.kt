@@ -1,6 +1,8 @@
 package com.example.diabai.ui
 
+import com.example.diabai.data.McpServerConfig
 import com.example.diabai.domain.ConfirmationRequest
+import com.example.diabai.domain.SourceChoiceRequest
 
 sealed interface ChatItem {
     val id: String
@@ -45,6 +47,16 @@ sealed interface ChatItem {
         override val id: String,
         val description: String,
         val request: ConfirmationRequest,
+        override val timestampMillis: Long = System.currentTimeMillis(),
+    ) : ChatItem
+
+    /** Item 4's "Interaktive Rückfrage im Chat" -- rendered as one button per [options] server
+     * plus an "Alle Quellen" button (see [SourceChoiceRequest]'s null-means-all contract), instead
+     * of [PendingConfirmation]'s fixed Ja/Nein pair. */
+    data class PendingSourceChoice(
+        override val id: String,
+        val options: List<McpServerConfig>,
+        val request: SourceChoiceRequest,
         override val timestampMillis: Long = System.currentTimeMillis(),
     ) : ChatItem
 

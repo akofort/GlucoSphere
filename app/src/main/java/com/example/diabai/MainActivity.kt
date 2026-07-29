@@ -15,6 +15,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.diabai.data.AppSettings
 import com.example.diabai.data.ModelFileManager
 import com.example.diabai.data.SettingsRepository
 import com.example.diabai.domain.DiabetesAgent
@@ -97,7 +98,11 @@ class MainActivity : ComponentActivity() {
         }
 
         setContent {
-            GlucoSphereTheme {
+            // Collected here (not inside GlucoSphereApp) so the color theme applies to the
+            // MaterialTheme wrapper itself -- GlucoSphereApp's own settings collection is scoped
+            // to its content, one level too deep to affect colorScheme up here.
+            val settings by settingsRepository.settings.collectAsState(initial = AppSettings())
+            GlucoSphereTheme(colorTheme = settings.colorTheme) {
                 GlucoSphereApp(
                     dashboardManager = dashboardManager,
                     agent = agent,

@@ -51,14 +51,22 @@ import java.time.format.DateTimeFormatter
 const val NIGHTSCOUT_DIRECT_SERVER_ID = "nightscout-direct-api"
 const val NIGHTSCOUT_DIRECT_TOOL_NAME = "get_glucose_entries"
 
+/** True for the one synthetic direct-REST-API source ([NIGHTSCOUT_DIRECT_SERVER_ID]); false for
+ * every real MCP server. The only REST-type source that currently exists -- used wherever the UI
+ * needs to tell "direct API" and "MCP server" apart (color-coding, the "⚡ Direkt-API" hint, see
+ * DataSourcesScreen/DashboardSection/ChatSection). */
+val McpServerConfig.isRestApi: Boolean get() = id == NIGHTSCOUT_DIRECT_SERVER_ID
+
 /** [AppSettings]'s direct-Nightscout-API fields, reshaped as an [McpServerConfig] so it can sit
  * in the same server list the dashboard/chat filter chips and per-category ">5 Tage" throttling
- * already operate on -- null if no direct API URL is configured. */
+ * already operate on -- null if no direct API URL is configured. [nightscoutApiName] lets the
+ * user rename this source (e.g. just "Nightscout" instead of the technical-sounding default) the
+ * same way any real MCP server's name is already editable. */
 fun AppSettings.nightscoutDirectServer(): McpServerConfig? {
     if (nightscoutApiUrl.isBlank()) return null
     return McpServerConfig(
         id = NIGHTSCOUT_DIRECT_SERVER_ID,
-        name = "Nightscout (Direkt-API)",
+        name = nightscoutApiName.ifBlank { "Nightscout" },
         url = nightscoutApiUrl,
         authMethod = nightscoutApiAuthMethod,
         token = nightscoutApiSecret,

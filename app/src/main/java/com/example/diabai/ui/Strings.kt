@@ -123,6 +123,7 @@ internal interface SettingsOverviewScreenStrings {
     val settingsTitle: String
     val languageLabel: String
     val languageHint: String
+    val appearanceSectionTitle: String
     val llmConfigMenuTitle: String
     val dataSourcesMenuTitle: String
     val systemPromptMenuTitle: String
@@ -158,6 +159,8 @@ internal interface GenericStrings {
     val genericRemove: String
     val genericYes: String
     val genericNo: String
+    val sourceChoiceQuestion: (List<String>) -> String
+    val sourceChoiceAllOption: String
     val genericClose: String
     val genericApply: String
     val genericEnabled: String
@@ -230,6 +233,7 @@ internal interface DataSourcesScreenStrings {
     val dsToolsCount: (Int) -> String
     val dsNameLabel: String
     val dsNamePlaceholder: String
+    val dsRestApiHint: String
     val dsUrlLabel: String
     val dsTokenSecretLabel: String
     val dsDataSourceEnabled: String
@@ -509,6 +513,7 @@ private val StringsDe = Strings(
         override val languageLabel = "Sprache"
         override val languageHint = "Steuert die Sprachein-/ausgabe (Mikrofon/Vorlesen) sowie die Ampel-Bezeichnung " +
         "(Grün/Gelb/Rot bzw. Green/Yellow/Red)."
+        override val appearanceSectionTitle = "Erscheinungsbild"
         override val llmConfigMenuTitle = "LLM-Konfiguration"
         override val dataSourcesMenuTitle = "Datenquellen (MCP & API)"
         override val systemPromptMenuTitle = "System-Prompt"
@@ -542,6 +547,10 @@ private val StringsDe = Strings(
         override val genericRemove = "Entfernen"
         override val genericYes = "Ja"
         override val genericNo = "Nein"
+        override val sourceChoiceQuestion: (List<String>) -> String = { names ->
+            "Dafür stehen mehrere Quellen zur Verfügung: ${names.joinToString(", ")}. Welche soll ich verwenden?"
+        }
+        override val sourceChoiceAllOption = "Alle Quellen"
         override val genericClose = "Schließen"
         override val genericApply = "Übernehmen"
         override val genericEnabled = "Aktiviert"
@@ -622,6 +631,7 @@ private val StringsDe = Strings(
         override val dsToolsCount: (Int) -> String = { n -> "$n Tools" }
         override val dsNameLabel = "Name"
         override val dsNamePlaceholder = "z. B. Nightscout"
+        override val dsRestApiHint = "⚡ Direkt-API (i.d.R. schneller)"
         override val dsUrlLabel = "SSE/HTTP-URL"
         override val dsTokenSecretLabel = "Token / Secret"
         override val dsDataSourceEnabled = "Datenquelle aktiviert"
@@ -669,7 +679,7 @@ private val StringsDe = Strings(
         "verfügbar ist. Token/API-Secret sind optional (nur für private Instanzen nötig)."
         override val dsNightscoutUrlLabel = "Nightscout-URL"
         override val dsNightscoutDiscoveryHint = "Erkennt automatisch installierte Plugins (Careportal, OpenAPS, IOB, COB, ...)."
-        override val dsNightscoutRestApiName = "Nightscout REST-API"
+        override val dsNightscoutRestApiName = "Nightscout"
         override val dsDiscoverySheetExploring = "Werkzeuge werden erkundet …"
         override val dsDiscoveryNotExploredYet = "Noch nicht erkundet. Tippe unten auf \"Erkunden\", um die verfügbaren Werkzeuge " +
         "und passende Beispielfragen automatisch zu ermitteln."
@@ -954,6 +964,7 @@ private val StringsEn = Strings(
         override val languageLabel = "Language"
         override val languageHint = "Controls voice input/output (microphone/read-aloud) as well as the traffic-light " +
         "label (Grün/Gelb/Rot resp. Green/Yellow/Red)."
+        override val appearanceSectionTitle = "Appearance"
         override val llmConfigMenuTitle = "LLM configuration"
         override val dataSourcesMenuTitle = "Data sources (MCP & API)"
         override val systemPromptMenuTitle = "System prompt"
@@ -987,6 +998,10 @@ private val StringsEn = Strings(
         override val genericRemove = "Remove"
         override val genericYes = "Yes"
         override val genericNo = "No"
+        override val sourceChoiceQuestion: (List<String>) -> String = { names ->
+            "Several sources are available for this: ${names.joinToString(", ")}. Which one should I use?"
+        }
+        override val sourceChoiceAllOption = "All sources"
         override val genericClose = "Close"
         override val genericApply = "Apply"
         override val genericEnabled = "Enabled"
@@ -1067,6 +1082,7 @@ private val StringsEn = Strings(
         override val dsToolsCount: (Int) -> String = { n -> "$n tools" }
         override val dsNameLabel = "Name"
         override val dsNamePlaceholder = "e.g. Nightscout"
+        override val dsRestApiHint = "⚡ Direct API (usually faster)"
         override val dsUrlLabel = "SSE/HTTP URL"
         override val dsTokenSecretLabel = "Token / Secret"
         override val dsDataSourceEnabled = "Data source enabled"
@@ -1114,7 +1130,7 @@ private val StringsEn = Strings(
         "is available. Token/API secret are optional (only needed for private instances)."
         override val dsNightscoutUrlLabel = "Nightscout URL"
         override val dsNightscoutDiscoveryHint = "Automatically detects installed plugins (Careportal, OpenAPS, IOB, COB, ...)."
-        override val dsNightscoutRestApiName = "Nightscout REST API"
+        override val dsNightscoutRestApiName = "Nightscout"
         override val dsDiscoverySheetExploring = "Exploring tools …"
         override val dsDiscoveryNotExploredYet = "Not explored yet. Tap \"Explore\" below to automatically determine the " +
         "available tools and matching example questions."

@@ -93,6 +93,10 @@ data class AppSettings(
     val nightscoutApiUrl: String = "",
     val nightscoutApiSecret: String = "",
     val nightscoutApiAuthMethod: AuthMethod = AuthMethod.API_SECRET_HEADER,
+    /** User-editable display name for the direct Nightscout REST API source (see
+     * [com.example.diabai.network.nightscoutDirectServer]) -- blank falls back to plain
+     * "Nightscout", same editable-name pattern every [McpServerConfig] already has. */
+    val nightscoutApiName: String = "",
     /** Whether the direct Nightscout REST API is actually queried -- defaults to true so
      * decoding an already-persisted config saved before this field existed keeps behaving as
      * before (queried whenever a URL is set), mirroring [McpServerConfig.enabled]'s same
@@ -129,6 +133,8 @@ data class AppSettings(
     /** "Einstellungen -> Profil / Benutzer" -- see [UserRole]'s doc comment. Drives tone/focus of
      * the system prompt via [personalizedSystemPrompt]/[anonymizedSystemPrompt]'s `withUserRole`. */
     val userRole: UserRole = UserRole.DIABETIKER,
+    /** "Einstellungen -> Erscheinungsbild" -- see [AppColorTheme]. */
+    val colorTheme: AppColorTheme = AppColorTheme.MEDICAL_BLUE,
     /** DownloadManager request id of an in-flight model download, if any (survives process death). */
     val activeDownloadId: Long? = null,
     /** Cloud-LLM token usage, last [LLM_USAGE_RETENTION_DAYS] days -- see "LLM-Verbrauch &
@@ -305,6 +311,7 @@ class SettingsRepository(context: Context) {
         val NIGHTSCOUT_API_SECRET = stringPreferencesKey("nightscout_api_secret")
         val NIGHTSCOUT_API_AUTH_METHOD = stringPreferencesKey("nightscout_api_auth_method")
         val NIGHTSCOUT_API_ENABLED = booleanPreferencesKey("nightscout_api_enabled")
+        val NIGHTSCOUT_API_NAME = stringPreferencesKey("nightscout_api_name")
         val SYSTEM_PROMPT = stringPreferencesKey("system_prompt")
         val CHAT_SESSIONS = stringPreferencesKey("chat_sessions")
         val LLM_PROVIDER_TYPE = stringPreferencesKey("llm_provider_type")
@@ -320,6 +327,7 @@ class SettingsRepository(context: Context) {
         val DEEPSEEK_MODEL = stringPreferencesKey("deepseek_model")
         val APP_LANGUAGE = stringPreferencesKey("app_language")
         val USER_ROLE = stringPreferencesKey("user_role")
+        val COLOR_THEME = stringPreferencesKey("color_theme")
         val ACTIVE_DOWNLOAD_ID = longPreferencesKey("active_download_id")
         val LLM_USAGE = stringPreferencesKey("llm_usage")
         val LLM_REQUEST_LOG = stringPreferencesKey("llm_request_log")
@@ -347,6 +355,7 @@ class SettingsRepository(context: Context) {
             nightscoutApiSecret = prefs[Keys.NIGHTSCOUT_API_SECRET].orEmpty(),
             nightscoutApiAuthMethod = prefs[Keys.NIGHTSCOUT_API_AUTH_METHOD].toAuthMethod(AuthMethod.API_SECRET_HEADER),
             nightscoutApiEnabled = prefs[Keys.NIGHTSCOUT_API_ENABLED] ?: true,
+            nightscoutApiName = prefs[Keys.NIGHTSCOUT_API_NAME].orEmpty(),
             systemPrompt = prefs[Keys.SYSTEM_PROMPT] ?: DEFAULT_SYSTEM_PROMPT,
             chatSessions = prefs[Keys.CHAT_SESSIONS].orEmpty().decodeChatSessions(),
             llmProviderType = prefs[Keys.LLM_PROVIDER_TYPE].toLlmProviderType(),
@@ -362,6 +371,7 @@ class SettingsRepository(context: Context) {
             deepseekModel = prefs[Keys.DEEPSEEK_MODEL] ?: AUTO_MODEL_ID,
             appLanguage = prefs[Keys.APP_LANGUAGE].toAppLanguage(),
             userRole = prefs[Keys.USER_ROLE].toUserRole(),
+            colorTheme = prefs[Keys.COLOR_THEME].toAppColorTheme(),
             activeDownloadId = prefs[Keys.ACTIVE_DOWNLOAD_ID],
             llmUsage = prefs[Keys.LLM_USAGE].orEmpty().decodeDailyLlmUsage(),
             additionalInstructions = prefs[Keys.ADDITIONAL_INSTRUCTIONS].orEmpty(),
@@ -430,12 +440,13 @@ class SettingsRepository(context: Context) {
         appContext.dataStore.edit { it[Keys.MCP_SERVERS] = servers.take(MAX_MCP_SERVERS).encodeToJson() }
     }
 
-    suspend fun saveNightscoutApi(url: String, secret: String, authMethod: AuthMethod, enabled: Boolean) {
+    suspend fun saveNightscoutApi(url: String, secret: String, authMethod: AuthMethod, enabled: Boolean, name: String = "") {
         appContext.dataStore.edit {
             it[Keys.NIGHTSCOUT_API_URL] = url
             it[Keys.NIGHTSCOUT_API_SECRET] = secret
             it[Keys.NIGHTSCOUT_API_AUTH_METHOD] = authMethod.name
             it[Keys.NIGHTSCOUT_API_ENABLED] = enabled
+            it[Keys.NIGHTSCOUT_API_NAME] = name
         }
     }
 
@@ -566,6 +577,11 @@ class SettingsRepository(context: Context) {
         appContext.dataStore.edit { it[Keys.USER_ROLE] = role.name }
     }
 
+    /** "Einstellungen -> Erscheinungsbild" -- see [AppColorTheme]. */
+    suspend fun saveColorTheme(theme: AppColorTheme) {
+        appContext.dataStore.edit { it[Keys.COLOR_THEME] = theme.name }
+    }
+
     /** Called once per cloud-LLM turn (see [com.example.diabai.domain.DiabetesAgent]) with
      * whatever token counts that provider's response reported -- never called for the local
      * model. Best-effort: a provider that doesn't report usage this turn simply isn't recorded,
@@ -632,6 +648,7 @@ class SettingsRepository(context: Context) {
             prefs[Keys.NIGHTSCOUT_API_SECRET] = backup.nightscoutApiSecret
             prefs[Keys.NIGHTSCOUT_API_AUTH_METHOD] = backup.nightscoutApiAuthMethod.name
             prefs[Keys.NIGHTSCOUT_API_ENABLED] = backup.nightscoutApiEnabled
+            prefs[Keys.NIGHTSCOUT_API_NAME] = backup.nightscoutApiName
             prefs[Keys.SYSTEM_PROMPT] = backup.systemPrompt
             prefs[Keys.ADDITIONAL_INSTRUCTIONS] = backup.additionalInstructions
             prefs[Keys.LICENSE_KEY] = backup.licenseKey
@@ -650,6 +667,7 @@ class SettingsRepository(context: Context) {
             prefs[Keys.ONEPROVIDER_MODEL] = backup.oneProviderModel
             prefs[Keys.APP_LANGUAGE] = backup.appLanguage.name
             prefs[Keys.USER_ROLE] = backup.userRole.name
+            prefs[Keys.COLOR_THEME] = backup.colorTheme.name
             prefs[Keys.LLM_USAGE] = backup.llmUsage.encodeToJson()
         }
     }
@@ -691,3 +709,6 @@ private fun String?.toAppLanguage(): AppLanguage =
 
 private fun String?.toUserRole(): UserRole =
     this?.let { runCatching { UserRole.valueOf(it) }.getOrNull() } ?: UserRole.DIABETIKER
+
+private fun String?.toAppColorTheme(): AppColorTheme =
+    this?.let { runCatching { AppColorTheme.valueOf(it) }.getOrNull() } ?: AppColorTheme.MEDICAL_BLUE

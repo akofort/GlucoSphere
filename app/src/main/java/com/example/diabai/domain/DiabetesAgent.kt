@@ -62,6 +62,13 @@ sealed interface AgentEvent {
     /** The model wants to run [toolCall]; the UI must call [ConfirmationRequest.respond]. */
     data class ConfirmationRequired(val request: ConfirmationRequest) : AgentEvent
 
+    /** "Interaktive Rückfrage" (item 4): [request] was ambiguous -- two or more enabled servers
+     * of the very same [com.example.diabai.data.McpDataCategory] could equally answer it, and the
+     * user didn't already pin one down via a chat server chip. [options] are those candidate
+     * servers (never empty, never fewer than 2); the UI must call
+     * [SourceChoiceRequest.respond] with the picked server's id, or null for "alle verwenden". */
+    data class SourceChoiceRequired(val request: SourceChoiceRequest, val options: List<McpServerConfig>) : AgentEvent
+
     /** [serverName] is the already-resolved display name of whichever server owns this tool
      * (including the synthetic "Nightscout (Direkt-API)" server) -- resolved here in the agent
      * loop, where the [com.example.diabai.data.AppSettings.allDataSourceServers]/`serverId`
@@ -89,6 +96,20 @@ class ConfirmationRequest(val description: String) {
 
     fun respond(approved: Boolean) {
         deferred.complete(approved)
+    }
+}
+
+/** A pending "which source did you mean?" question raised by [DiabetesAgent.askChat] before
+ * [DiabetesAgent] resolveTools/tool-loop even starts (item 4's "Interaktive Rückfrage im Chat") --
+ * same suspend-until-answered shape as [ConfirmationRequest], just with an N-way pick instead of
+ * yes/no. `null` means "alle verwenden" (query every candidate rather than narrowing to one). */
+class SourceChoiceRequest {
+    private val deferred = CompletableDeferred<String?>()
+
+    suspend fun await(): String? = deferred.await()
+
+    fun respond(pickedServerId: String?) {
+        deferred.complete(pickedServerId)
     }
 }
 
@@ -326,8 +347,24 @@ class DiabetesAgent(
         }
 
         val isLocal = settings.llmProviderType == LlmProviderType.LOCAL
+
+        // Item 4's "Interaktive Rückfrage": ask instead of silently querying every ambiguous
+        // source (or silently guessing one) whenever 2+ same-category servers could equally
+        // answer this and the user hasn't already pinned one down via a chat server chip.
+        var effectiveSelectedServerIds = selectedServerIds
+        if (includeMcpTools) {
+            val enabledServers = settings.allDataSourceServers.filter { it.enabled }
+            val ambiguousGroup = detectSourceAmbiguity(enabledServers, selectedServerIds, request)
+            if (ambiguousGroup != null) {
+                val choiceRequest = SourceChoiceRequest()
+                emit(AgentEvent.SourceChoiceRequired(choiceRequest, ambiguousGroup))
+                val pickedServerId = choiceRequest.await()
+                effectiveSelectedServerIds = pickedServerId?.let { setOf(it) } ?: ambiguousGroup.map { it.id }.toSet()
+            }
+        }
+
         val resolved = resolveTools(
-            settings, includeMcpTools, selectedServerIds, request,
+            settings, includeMcpTools, effectiveSelectedServerIds, request,
             applyContextualSelection = true, excludedToolNames = excludedToolNames, allowedTags = allowedTags,
         )
         val personaPrompt = personaPromptFor(settings) + buildToolRegistryPrompt(resolved.pooledTools, settings.allDataSourceServers)
@@ -472,6 +509,53 @@ class DiabetesAgent(
      * selection and shouldn't have it second-guessed by a keyword heuristic over their internal
      * instruction text.
      */
+    /** The narrowing chain shared by [resolveTools] and [detectSourceAmbiguity] -- pulled out so
+     * both apply the exact same heuristics in the exact same order and can never silently drift
+     * apart (e.g. the ambiguity check "resolving" something [resolveTools] would have narrowed
+     * differently). See [resolveTools]'s own doc comment for what each step does. */
+    private fun computeEffectiveServerIds(
+        enabledServers: List<McpServerConfig>,
+        selectedServerIds: Set<String>?,
+        request: String,
+        applyContextualSelection: Boolean,
+    ): Set<String> {
+        val explicitSelection = selectedServerIds != null
+        var effectiveIds = selectedServerIds ?: enabledServers.map { it.id }.toSet()
+
+        if (applyContextualSelection) {
+            if (!explicitSelection) {
+                inferQueryCategory(request)?.let { category ->
+                    val matching = enabledServers.filter { it.category == category && it.id in effectiveIds }
+                    if (matching.isNotEmpty()) effectiveIds = matching.map { it.id }.toSet()
+                }
+            }
+            if ((inferSpanDays(request) ?: 0) > 5) {
+                effectiveIds = restrictToOnePerCategory(enabledServers, effectiveIds)
+            }
+            if (isCurrentValueQuery(request)) {
+                effectiveIds = preferNightscoutForCurrentValue(enabledServers, effectiveIds)
+            }
+        }
+        return effectiveIds
+    }
+
+    /** Item 4's "Interaktive Rückfrage": true ambiguity is when the user gave no explicit
+     * selection (no chat server chip active) AND, after every heuristic in
+     * [computeEffectiveServerIds] has already run, 2+ enabled servers of the very same
+     * [com.example.diabai.data.McpDataCategory] are still both in scope -- e.g. glucose data
+     * sitting in both Nightscout and Glooko with nothing (chip, contextual category match, >5-day
+     * throttling, "aktueller Wert" Nightscout-preference) strong enough to pick just one. Returns
+     * null when there's nothing to ask about, including whenever [selectedServerIds] already
+     * pins the answer down explicitly. */
+    private fun detectSourceAmbiguity(
+        enabledServers: List<McpServerConfig>, selectedServerIds: Set<String>?, request: String,
+    ): List<McpServerConfig>? {
+        if (selectedServerIds != null) return null
+        val effectiveIds = computeEffectiveServerIds(enabledServers, selectedServerIds, request, applyContextualSelection = true)
+        val candidates = enabledServers.filter { it.id in effectiveIds }
+        return candidates.groupBy { it.category }.values.firstOrNull { it.size > 1 }
+    }
+
     private suspend fun resolveTools(
         settings: AppSettings,
         includeMcpTools: Boolean,
@@ -496,23 +580,7 @@ class DiabetesAgent(
         }
 
         val enabledServers = settings.allDataSourceServers.filter { it.enabled }
-        val explicitSelection = selectedServerIds != null
-        var effectiveIds = selectedServerIds ?: enabledServers.map { it.id }.toSet()
-
-        if (applyContextualSelection) {
-            if (!explicitSelection) {
-                inferQueryCategory(request)?.let { category ->
-                    val matching = enabledServers.filter { it.category == category && it.id in effectiveIds }
-                    if (matching.isNotEmpty()) effectiveIds = matching.map { it.id }.toSet()
-                }
-            }
-            if ((inferSpanDays(request) ?: 0) > 5) {
-                effectiveIds = restrictToOnePerCategory(enabledServers, effectiveIds)
-            }
-            if (isCurrentValueQuery(request)) {
-                effectiveIds = preferNightscoutForCurrentValue(enabledServers, effectiveIds)
-            }
-        }
+        val effectiveIds = computeEffectiveServerIds(enabledServers, selectedServerIds, request, applyContextualSelection)
 
         val mcpPooledTools = mcpServerPool.listAllTools(settings.mcpServers.filter { it.enabled })
             .filter { it.serverId in effectiveIds }
@@ -1154,6 +1222,10 @@ class DiabetesAgent(
                 is AgentEvent.ToolCallCompleted,
                 is AgentEvent.ToolCallDeclined,
                 is AgentEvent.ConfirmationRequired,
+                // generateReport() always calls ask(), never askChat() -- the only producer of
+                // SourceChoiceRequired -- so this branch is unreachable here, just required for
+                // exhaustiveness.
+                is AgentEvent.SourceChoiceRequired,
                 is AgentEvent.ModelResolved,
                 AgentEvent.Complete,
                 -> Unit

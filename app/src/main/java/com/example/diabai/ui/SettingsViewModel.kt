@@ -269,6 +269,11 @@ class SettingsViewModel(
         viewModelScope.launch { settingsRepository.saveUserRole(role) }
     }
 
+    /** "Einstellungen -> Erscheinungsbild" (see [com.example.diabai.data.AppColorTheme]). */
+    fun saveColorTheme(theme: com.example.diabai.data.AppColorTheme) {
+        viewModelScope.launch { settingsRepository.saveColorTheme(theme) }
+    }
+
     fun importModel(uri: Uri) {
         viewModelScope.launch {
             _isImporting.value = true
@@ -676,8 +681,8 @@ class SettingsViewModel(
         }
     }
 
-    fun saveNightscoutApi(url: String, authMethod: AuthMethod, secret: String, enabled: Boolean) {
-        viewModelScope.launch { settingsRepository.saveNightscoutApi(url, secret, authMethod, enabled) }
+    fun saveNightscoutApi(url: String, authMethod: AuthMethod, secret: String, enabled: Boolean, name: String = "") {
+        viewModelScope.launch { settingsRepository.saveNightscoutApi(url, secret, authMethod, enabled, name) }
     }
 
     fun saveSystemPrompt(prompt: String) {

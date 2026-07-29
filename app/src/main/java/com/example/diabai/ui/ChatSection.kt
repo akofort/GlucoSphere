@@ -18,6 +18,8 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -34,6 +36,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import android.content.Intent
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.IconButton
@@ -71,6 +74,7 @@ import com.example.diabai.domain.CapabilityTag
 import com.example.diabai.domain.CapabilityTagGroup
 import com.example.diabai.domain.inferCapabilityTags
 import com.example.diabai.domain.shareChatAnswerAsPdf
+import com.example.diabai.ui.theme.sourceTypeAccentColor
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -137,6 +141,7 @@ fun buildChatShareText(
                 }
                 is ChatItem.ToolActivity -> appendLine("[$time] 🔧 ${item.toolName}: ${item.summary}")
                 is ChatItem.PendingConfirmation -> appendLine("[$time] ❓ ${item.description}")
+                is ChatItem.PendingSourceChoice -> appendLine("[$time] ❓ ${item.options.joinToString(" / ") { it.displayName }}?")
                 is ChatItem.ErrorMessage -> appendLine("[$time] ⚠️ ${item.text}")
                 is ChatItem.SystemNote -> appendLine("[$time] ℹ️ ${item.text}")
             }
@@ -170,6 +175,7 @@ fun ChatSection(
     onSend: (String) -> Unit,
     onCancel: () -> Unit,
     onConfirm: (ChatItem.PendingConfirmation, Boolean) -> Unit,
+    onSourceChoice: (ChatItem.PendingSourceChoice, String?) -> Unit,
     /** Long-press-to-copy feedback ("Nachricht kopiert") -- the actual clipboard write happens
      * right in [ChatBubble]/[AssistantBubble], this just surfaces the Snackbar. */
     onMessageCopied: () -> Unit,
@@ -269,7 +275,7 @@ fun ChatSection(
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            items(items, key = { it.id }) { item -> ChatItemRow(item, onConfirm, onMessageCopied, ttsController) }
+            items(items, key = { it.id }) { item -> ChatItemRow(item, onConfirm, onSourceChoice, onMessageCopied, ttsController) }
             item(key = "ai-activity-indicator") { TypingIndicatorBubble(aiActivityState) }
         }
         if (voiceModeActive) {
@@ -527,6 +533,7 @@ private fun ToolPillChip(label: String, selected: Boolean, enabled: Boolean, onC
 private fun ChatItemRow(
     item: ChatItem,
     onConfirm: (ChatItem.PendingConfirmation, Boolean) -> Unit,
+    onSourceChoice: (ChatItem.PendingSourceChoice, String?) -> Unit,
     onMessageCopied: () -> Unit,
     ttsController: TtsController?,
 ) {
@@ -535,6 +542,7 @@ private fun ChatItemRow(
         is ChatItem.AssistantMessage -> AssistantBubble(item, onCopied = onMessageCopied, ttsController = ttsController)
         is ChatItem.ToolActivity -> ToolActivityRow(item)
         is ChatItem.PendingConfirmation -> ConfirmationCard(item, onConfirm)
+        is ChatItem.PendingSourceChoice -> SourceChoiceCard(item, onSourceChoice)
         is ChatItem.ErrorMessage -> Text(
             text = item.text,
             color = MaterialTheme.colorScheme.error,
@@ -789,6 +797,37 @@ private fun ConfirmationCard(item: ChatItem.PendingConfirmation, onConfirm: (Cha
                 Button(onClick = { onConfirm(item, true) }) { Text(strings.genericYes) }
                 Spacer(Modifier.width(8.dp))
                 OutlinedButton(onClick = { onConfirm(item, false) }) { Text(strings.genericNo) }
+            }
+        }
+    }
+}
+
+/** Item 4's "Interaktive Rückfrage im Chat": one button per ambiguous candidate server -- colored
+ * by [sourceTypeAccentColor] so this doubles as the request's "Chat-Chips" REST/MCP color
+ * differentiation (item 1) -- plus a plain "Alle Quellen" button (null pick, see
+ * [com.example.diabai.domain.SourceChoiceRequest]). [FlowRow] rather than a fixed [Row] since 2-3
+ * source names plus the "Alle Quellen" button can easily exceed one line on a phone-width card. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun SourceChoiceCard(item: ChatItem.PendingSourceChoice, onChoice: (ChatItem.PendingSourceChoice, String?) -> Unit) {
+    val strings = LocalStrings.current
+    Surface(
+        color = MaterialTheme.colorScheme.tertiaryContainer,
+        shape = MaterialTheme.shapes.medium,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(Modifier.padding(12.dp)) {
+            Text(strings.sourceChoiceQuestion(item.options.map { it.displayName }), style = MaterialTheme.typography.bodyMedium)
+            Spacer(Modifier.height(8.dp))
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                item.options.forEach { option ->
+                    val accentColor = option.sourceTypeAccentColor
+                    Button(
+                        onClick = { onChoice(item, option.id) },
+                        colors = ButtonDefaults.buttonColors(containerColor = accentColor),
+                    ) { Text(option.displayName) }
+                }
+                OutlinedButton(onClick = { onChoice(item, null) }) { Text(strings.sourceChoiceAllOption) }
             }
         }
     }

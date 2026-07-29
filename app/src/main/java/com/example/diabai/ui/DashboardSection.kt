@@ -26,6 +26,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -57,6 +58,7 @@ import com.example.diabai.domain.analytics.TrafficLightStatus
 import com.example.diabai.domain.analytics.displayLabel
 import com.example.diabai.domain.analytics.estimatedHbA1cPercent
 import com.example.diabai.domain.analytics.label
+import com.example.diabai.ui.theme.sourceTypeAccentColor
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -218,6 +220,7 @@ fun DashboardSection(
                     servers.forEach { server ->
                         val isSelected = selectedServerIds?.contains(server.id) ?: true
                         val hasNoData = server.id in dataUnavailableServerIds
+                        val accentColor = server.sourceTypeAccentColor
                         FilterChip(
                             selected = isSelected,
                             onClick = { onToggleServer(server.id) },
@@ -227,6 +230,17 @@ fun DashboardSection(
                                         if (hasNoData) strings.noDataSuffix else "",
                                 )
                             },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = accentColor.copy(alpha = 0.22f),
+                                selectedLabelColor = accentColor,
+                                selectedLeadingIconColor = accentColor,
+                            ),
+                            border = FilterChipDefaults.filterChipBorder(
+                                enabled = true,
+                                selected = isSelected,
+                                borderColor = accentColor.copy(alpha = 0.5f),
+                                selectedBorderColor = accentColor,
+                            ),
                         )
                     }
                 }

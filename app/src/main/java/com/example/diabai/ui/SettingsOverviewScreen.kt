@@ -1,12 +1,21 @@
 package com.example.diabai.ui
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
@@ -17,12 +26,16 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.example.diabai.data.AppColorTheme
 import com.example.diabai.data.AppLanguage
 import com.example.diabai.data.DEFAULT_SYSTEM_PROMPT
 import com.example.diabai.data.LlmProviderType
 import com.example.diabai.data.ONEPROVIDER_FREE_DAILY_REQUEST_LIMIT
 import com.example.diabai.domain.EngineState
+import com.example.diabai.ui.theme.swatchColorFor
 import java.io.File
 
 /** Top-level settings menu: navigates into the three sub-screens. */
@@ -108,6 +121,12 @@ fun SettingsOverviewScreen(
         }
 
         Column {
+            Text(strings.appearanceSectionTitle, style = MaterialTheme.typography.titleSmall)
+            Spacer(Modifier.height(4.dp))
+            ColorThemePicker(selected = settings.colorTheme, onSelect = viewModel::saveColorTheme)
+        }
+
+        Column {
             SettingsMenuRow(
                 title = strings.profileTitle,
                 subtitle = profileRoleSubtitle,
@@ -158,6 +177,41 @@ fun SettingsOverviewScreen(
                 onClick = onOpenAbout,
             )
             HorizontalDivider()
+        }
+    }
+}
+
+/** "Einstellungen -> Erscheinungsbild": one tappable color swatch per [AppColorTheme], each
+ * previewing that theme's own primary color (see [swatchColorFor]) rather than a plain text
+ * label/chip -- the whole point of a color picker is to see the color, not read its name. The
+ * selected swatch gets a ring in the CURRENTLY ACTIVE theme's primary color (not the swatch's own
+ * color), so the ring stays visible/legible regardless of which swatch it's marking. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun ColorThemePicker(selected: AppColorTheme, onSelect: (AppColorTheme) -> Unit) {
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        AppColorTheme.entries.forEach { theme ->
+            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.width(72.dp)) {
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .background(swatchColorFor(theme))
+                        .border(
+                            width = if (theme == selected) 3.dp else 0.dp,
+                            color = MaterialTheme.colorScheme.primary,
+                            shape = CircleShape,
+                        )
+                        .selectable(selected = theme == selected, onClick = { onSelect(theme) }),
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    text = theme.label,
+                    style = MaterialTheme.typography.labelSmall,
+                    textAlign = TextAlign.Center,
+                    color = if (theme == selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
     }
 }
